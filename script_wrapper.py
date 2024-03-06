@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import os.path
 import sys
 import pandas as pd
 
@@ -26,12 +25,10 @@ if __name__=="__main__":
     # data_file_path = os.path.abspath("user_data.json")
     # user_func_path = os.path.abspath("user_function.py")
     data_df = load_data(data_file_path)
-    #print(data_df)
+
     results = fonction_run(data_df, user_func_path)
-    # results_pd = pd.read_json(results, orient="index")
 
     # Indipensable d'avoir un print pour récuperer le résultat dans le subprocess
     print(results)
-    # print(type(results))
-    # print(results_pd)
+
 

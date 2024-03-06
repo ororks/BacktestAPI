@@ -9,60 +9,80 @@ import json
 import Backtest
 
 
-
 app = FastAPI()
 class User_input(BaseModel):
     """
-    Modèle de requête suivi par l'utilisateur :
-    func_strat : La fonction de trading de l'utilisateur en str qui renvoie un poids dans pour chaque actifs à chaque
-    date dans le portefeuille
-    requirements : liste des imports
-    tickers : liste des tickers considérés
-    dates_calibrations : liste des dates pour calibrer la fonction de stratégie
-    dates_test : dates sur lesquels ont teste la stratégie de trading
-    interval : fréquence des observations considérées
-    amount : montant du portefeuille
-    """
+       Modèle de requête suivi par l'utilisateur :
+
+       - func_strat : La fonction de trading en str renvoyant un poids pour chaque actif à chaque date.
+       - requirements : Liste des imports nécessaires.
+       - tickers : Liste des tickers considérés.
+       - dates_calibration : Dates pour calibrer la fonction de stratégie.
+       - dates_test : Dates sur lesquelles on teste la stratégie de trading.
+       - interval : Fréquence des observations considérées.
+       - amount : Montant initial du portefeuille.
+       - rqt_name : Nom de la requête pour identification.
+
+       """
     func_strat: str
     requirements: list[str]
     tickers: list[str]
     dates_calibration: list[str]
-    dates_test : list[str]
     interval: str
     amount: str
     rqt_name : str
 
 # Création de la route
 @app.post('/backtesting/')
+
 async def main(input: User_input):
+    """
+    :param input: Données utilisateurs spécifiées dans le modèle User_input.
+    :return: Les statistiques de backtest obtenues -> json
+    Gère les appels aux différentes fonctions de l'architecture et le déroulement du backtest.
+    - Récupère les données avec collect_APIdata() -> dictionnaire de pd.DataFrame
+    - Ecrit la fonction utilisateur dans un .py temporaire
+    - Converti en json les pd.DataFrame à l'intérieur du dictionnaire user_data
+    - Ecrit les données dans un fichier .json temporaire
+    - Appel de create_venv pour créer un environnement virtuel avec les packages requis
+        par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
+    - Appel de la fonction backtesting pour récupérer les statistiques.
+    """
     try:
         user_data = collect_APIdata(input.tickers, input.dates_calibration, input.interval)
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=f'erreur : {str(e)}')
 
-    # # save du dataframe en json
-    # user_data.to_json("user_data.json", orient="index", date_format="iso", indent=4)
-    #
+    # Save du dataframe en json
     with open("user_function.py", "w") as file:
         file.write(input.func_strat)
 
     # Conversion de chaque df en json
     dico_df_json = {key: df.to_json() for key, df in user_data.items()}
+
     # Serialisation du dico en json et save dans un fichier
     with open("user_data.json", "w") as file:
         json.dump(dico_df_json, file)
 
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
     result = pd.read_json(result_json, orient="index")
-    # return user_data
+
     stats_backtest = backtesting(result, user_data)
     return stats_backtest
-    # except Exception as e:
-    #     print(f"erreur : {e}")
-
-
 
 def create_venv(name, packages, funct):
+    """
+    :param name: Nom de la requête de l'utilisateur pour identification.
+    :param packages: packages donnés en input dans la requête de l'utilisateur.
+    :param funct: fonction donnée en input dans la requête de l'utilisateur.
+    :return: l'output défini par la fonction de l'utilisateur.
+    - Run un sous-processus avec l'interpréteur python qui créé un venv avec pour nom la requête de l'utilisateur
+    - Création du chemin vers le pip éxecutable pour le venv pour installer les packages
+    - Run d'un sous-processus par packages pour leurs installation dans le venv
+    - Création des paths vers les fichiers nécessaires (éxécutable, data, fonction, wrapper)
+    - Run d'un sous-processus d'éxécution du module script_wrapper avec les arguments data_path et function_path
+        Récupération des résultats de la fonction utilisateur par ce sous-processus -> pd.DataFrame
+    """
     # Création de l'environnement virtuel
     try:
         subprocess.run([sys.executable, "-m", "venv", name], check=True)
@@ -84,6 +104,7 @@ def create_venv(name, packages, funct):
     function_path = os.path.abspath(funct)
     wrapper_path = os.path.abspath("script_wrapper.py")
     data_path = os.path.abspath("user_data.json")
+
     try:
         result = subprocess.run([python_executable, wrapper_path, data_path, function_path], capture_output=True, check=True, text=True)
         response = result.stdout
