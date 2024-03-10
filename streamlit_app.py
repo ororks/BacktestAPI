@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 
 # L'URL de votre endpoint FastAPI (adaptez selon votre configuration)
-API_URL = "https://votre-application-sur-render.com/backtesting/"
+API_URL = "https://backtestapi.onrender.com/backtesting/"
 
 # Widgets Streamlit pour collecter les entrées de l'utilisateur
 func_strat = st.text_area("Entrer votre fonction de trading :", height=300)
