@@ -1,7 +1,7 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from Data_collector import collect_APIdata
+from Data_collector import DataCollector
 import subprocess
 import sys
 import os
@@ -48,8 +48,9 @@ async def main(input: User_input):
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
+    data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
-        user_data = collect_APIdata(input.tickers, input.dates_calibration, input.interval)
+        user_data = data_collector.collect_APIdata()
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=f'erreur : {str(e)}')
 
@@ -68,6 +69,8 @@ async def main(input: User_input):
     result = pd.read_json(result_json, orient="index")
 
     stats_backtest = backtesting(result, user_data)
+    os.remove(os.path.abspath("user_function.py"))
+    os.remove(os.path.abspath("user_data.json"))
     return stats_backtest
 
 def create_venv(name, packages, funct):
@@ -84,35 +87,21 @@ def create_venv(name, packages, funct):
         Récupération des résultats de la fonction utilisateur par ce sous-processus -> pd.DataFrame
     """
     # Création de l'environnement virtuel
-    try:
-        subprocess.run([sys.executable, "-m", "venv", name], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f'erreur : {str(e)}')
+    run_subprocess([sys.executable, "-m", "venv", name])
 
     # Création du chemin vers le pip executable pour l'env virtuel
     pip_route = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "pip")
 
     # Installation des packages
-    try:
-        for package in packages:
-            subprocess.run([pip_route, "install", package], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f'erreur : {str(e)}')
-
+    for package in packages:
+        run_subprocess([pip_route, "install", package])
     #
     python_executable = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "python")
     function_path = os.path.abspath(funct)
     wrapper_path = os.path.abspath("script_wrapper.py")
     data_path = os.path.abspath("user_data.json")
-
-    try:
-        result = subprocess.run([python_executable, wrapper_path, data_path, function_path], capture_output=True, check=True, text=True)
-        response = result.stdout
-        print(response)
-    except subprocess.CalledProcessError as e:
-        error = e.stderr
-        print(error)
-        return error
+    response = run_subprocess([python_executable, wrapper_path, data_path, function_path], capture_output=True,
+                              text=True)
     return response
 
 
@@ -120,4 +109,12 @@ def backtesting(weights, dico_df):
     backtest = Backtest.Stats(weights, dico_df)
     stats_bt = backtest.to_json()
     return stats_bt
+
+def run_subprocess(*args, **kwargs):
+    try:
+        result = subprocess.run(args, check=True, **kwargs)
+        return result
+    except subprocess.CalledProcessError as e:
+        return f"Erreur dans l'éxécution du sous-processus : {e}"
+
 
