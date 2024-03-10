@@ -1,7 +1,7 @@
 import requests
 
-#url = "http://127.0.0.1:8000/backtesting/"
-url = "https://backtestapi.onrender.com/backtesting/"
+url = "http://127.0.0.1:8000/backtesting/"
+#url = "https://backtestapi.onrender.com/backtesting/"
 fonction_trading = """
 import pandas
 def func_strat(dfs_dict):

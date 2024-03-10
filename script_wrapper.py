@@ -11,13 +11,13 @@ class Wrapper:
         self.data_result = None
         self.function_result = None
 
-    def load_data(self) -> Dict[str, pd.DataFrame]:
+    def load_data(self):
         with open(self.file_path, "r") as file:
             dico_df_json = json.load(file)
         self.data_result = {key: pd.read_json(df_json) for key, df_json in dico_df_json.items()}
         return self.data_result
 
-    def fonction_run(self) -> json:
+    def fonction_run(self):
         self.data_result = self.load_data()
         # Création des spécifications du module à partir du path de la fonction enregistrée en json
         spec = importlib.util.spec_from_file_location("function_module", self.function_path)

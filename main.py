@@ -66,6 +66,7 @@ async def main(input: User_input):
         json.dump(dico_df_json, file)
 
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
+    # return type(result_json)
     result = pd.read_json(result_json, orient="index")
 
     stats_backtest = backtesting(result, user_data)
@@ -87,21 +88,28 @@ def create_venv(name, packages, funct):
         Récupération des résultats de la fonction utilisateur par ce sous-processus -> pd.DataFrame
     """
     # Création de l'environnement virtuel
-    run_subprocess([sys.executable, "-m", "venv", name])
+    run_subprocess(sys.executable, "-m", "venv", name)
 
     # Création du chemin vers le pip executable pour l'env virtuel
     pip_route = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "pip")
 
     # Installation des packages
     for package in packages:
-        run_subprocess([pip_route, "install", package])
+        run_subprocess(pip_route, "install", package)
     #
     python_executable = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "python")
     function_path = os.path.abspath(funct)
     wrapper_path = os.path.abspath("script_wrapper.py")
     data_path = os.path.abspath("user_data.json")
-    response = run_subprocess([python_executable, wrapper_path, data_path, function_path], capture_output=True,
-                              text=True)
+    response = run_subprocess(python_executable, wrapper_path, data_path, function_path, capture_output=True, text=True)
+    # try:
+    #     result = subprocess.run([python_executable, wrapper_path, data_path, function_path], capture_output=True, check=True, text=True)
+    #     response = result.stdout
+    #     print(response)
+    # except subprocess.CalledProcessError as e:
+    #     error = e.stderr
+    #     print(error)
+    #     return error
     return response
 
 
@@ -113,7 +121,7 @@ def backtesting(weights, dico_df):
 def run_subprocess(*args, **kwargs):
     try:
         result = subprocess.run(args, check=True, **kwargs)
-        return result
+        return result.stdout
     except subprocess.CalledProcessError as e:
         return f"Erreur dans l'éxécution du sous-processus : {e}"
 
