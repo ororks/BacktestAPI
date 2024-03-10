@@ -1,38 +1,41 @@
-import json
-import os
-import subprocess
-import sys
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from backtest import Stats
-from data_collector import DataCollector
+from Data_collector import DataCollector
+import subprocess
+import sys
+import os
+import json
+import Backtest
+
 
 app = FastAPI()
-
-
-class UserInput(BaseModel):
+class User_input(BaseModel):
     """
        Modèle de requête suivi par l'utilisateur :
+
        - func_strat : La fonction de trading en str renvoyant un poids pour chaque actif à chaque date.
        - requirements : Liste des imports nécessaires.
        - tickers : Liste des tickers considérés.
-       - start_date : Date de début du backtest
-       - end_date : Date de fin du backtest
+       - dates_calibration : Dates pour calibrer la fonction de stratégie.
+       - dates_test : Dates sur lesquelles on teste la stratégie de trading.
        - interval : Fréquence des observations considérées.
+       - amount : Montant initial du portefeuille.
        - rqt_name : Nom de la requête pour identification.
+
        """
     func_strat: str
     requirements: list[str]
     tickers: list[str]
-    start_date: str
-    end_date: str
+    dates_calibration: list[str]
     interval: str
-    rqt_name: str
+    amount: str
+    rqt_name : str
 
-
+# Création de la route
 @app.post('/backtesting/')
-async def main(input: UserInput):
+
+async def main(input: User_input):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
     :return: Les statistiques de backtest obtenues -> json
@@ -45,9 +48,9 @@ async def main(input: UserInput):
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
-    data_collector = DataCollector(input.tickers, input.start_date, input.end_date, input.interval)
+    data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
-        user_data = data_collector.collect_all_data()
+        user_data = data_collector.collect_APIdata()
     except HTTPException as e:
         raise HTTPException(status_code=400, detail=f'erreur : {str(e)}')
 
@@ -63,13 +66,13 @@ async def main(input: UserInput):
         json.dump(dico_df_json, file)
 
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
+    # return type(result_json)
     result = pd.read_json(result_json, orient="index")
 
     stats_backtest = backtesting(result, user_data)
     os.remove(os.path.abspath("user_function.py"))
     os.remove(os.path.abspath("user_data.json"))
     return stats_backtest
-
 
 def create_venv(name, packages, funct):
     """
@@ -93,20 +96,27 @@ def create_venv(name, packages, funct):
     # Installation des packages
     for package in packages:
         run_subprocess(pip_route, "install", package)
-
+    #
     python_executable = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "python")
     function_path = os.path.abspath(funct)
     wrapper_path = os.path.abspath("script_wrapper.py")
     data_path = os.path.abspath("user_data.json")
     response = run_subprocess(python_executable, wrapper_path, data_path, function_path, capture_output=True, text=True)
+    # try:
+    #     result = subprocess.run([python_executable, wrapper_path, data_path, function_path], capture_output=True, check=True, text=True)
+    #     response = result.stdout
+    #     print(response)
+    # except subprocess.CalledProcessError as e:
+    #     error = e.stderr
+    #     print(error)
+    #     return error
     return response
 
 
-def backtesting(weights, dfs_dict):
-    backtest = Stats(weights, dfs_dict)
+def backtesting(weights, dico_df):
+    backtest = Backtest.Stats(weights, dico_df)
     stats_bt = backtest.to_json()
     return stats_bt
-
 
 def run_subprocess(*args, **kwargs):
     try:
@@ -114,3 +124,5 @@ def run_subprocess(*args, **kwargs):
         return result.stdout
     except subprocess.CalledProcessError as e:
         return f"Erreur dans l'éxécution du sous-processus : {e}"
+
+
