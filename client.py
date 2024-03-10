@@ -1,7 +1,7 @@
 import requests
 
-url = "http://127.0.0.1:8000/backtesting/"
-#url = "https://backtestapi.onrender.com/backtesting/"
+url = "https://backtestapi.onrender.com/backtesting/"
+
 fonction_trading = """
 import pandas
 def func_strat(dfs_dict):
@@ -39,11 +39,10 @@ def func_strat(dfs_dict):
 params = {
     "func_strat": fonction_trading,
     "requirements": ["pandas"],
-    "tickers": ["ETHBTC", "BNBETH"],
-    "dates_calibration": ["2022-01-01", "2022-01-07"],
-    "dates_test" : ["2023-01-01", "2024-01-01"],
+    "tickers": ["BTC", "ETH"],
+    "start_date": "2022-01-01",
+    "end_date": "2023-01-07",
     "interval": "1d",
-    "amount": "10000",
     "rqt_name": "rqt1"
 }
 
