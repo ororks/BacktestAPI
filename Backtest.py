@@ -1,6 +1,8 @@
 import json
 import numpy as np
 import pandas as pd
+
+
 class Stats:
     def __init__(self, poids_ts, dfs_dict):
         self.poids_ts = poids_ts
@@ -12,13 +14,10 @@ class Stats:
 
     def calculate_returns_from_dfs(self):
         df_closes = pd.DataFrame()
-        df_concat = pd.DataFrame()
         for key, df in self.dfs_dict.items():
-            df_closes = pd.DataFrame(df['Close'].items(), columns=['Date', key]).set_index('Date')
-            df_closes[key] = df_closes[key].astype(float)
-            df_concat = pd.concat([df_closes, df_concat], axis=1)
-        df_returns = df_concat.pct_change().fillna(0)
-        df_returns = df_returns.reset_index(drop=True)
+            df_closes[key] = df["Close"]
+        df_closes = df_closes.astype(float)
+        df_returns = df_closes.pct_change().fillna(0)
         return df_returns
 
     def calculate_index_returns(self):
@@ -26,8 +25,6 @@ class Stats:
         df_poids = self.poids_ts.reset_index(drop=True)
         df_index_returns = (df_returns * df_poids).sum(axis=1)
         return df_index_returns.to_frame(name='Index_Return')
-        #return self.poids_ts
-        #return df_returns
 
     def setup_metrics(self):
         self.r_annual = self.annualize_rets(self.r_indice, self.scale)
@@ -107,8 +104,3 @@ class Stats:
                                                                       pd.Series) else self.calmar_ratio
         }
         return json.dumps(stats_dict, indent=4)
-
-
-if __name__ == "__main__":
-
-    statistiques = Stats()

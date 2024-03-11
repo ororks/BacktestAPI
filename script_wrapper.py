@@ -1,8 +1,7 @@
 import importlib.util
 import json
-import sys
 import pandas as pd
-from typing import Dict
+
 
 class Wrapper:
     def __init__(self, file_path: str, function_path: str):
@@ -28,13 +27,3 @@ class Wrapper:
         results = function_module.func_strat(self.data_result)
         self.function_result = results.to_json(orient="index")
         return self.function_result
-
-if __name__=="__main__":
-    data_file_path = sys.argv[1]  # Chemin vers le fichier de données JSON.
-    user_func_path = sys.argv[2]  # Chemin vers le script de l'utilisateur.
-    wrapper = Wrapper(file_path=data_file_path, function_path=user_func_path)
-    results = wrapper.fonction_run()
-    # Indipensable d'avoir un print pour récuperer le résultat dans le subprocess
-    print(results)
-
-
