@@ -1,53 +1,39 @@
 import pandas as pd
 import requests
-
+from datetime import datetime, timezone
 
 class DataCollector:
-    def __init__(self, tickers: list[str], start_date: str, end_date: str, interval: str):
-        self.tickers = tickers
-        self.start_date = start_date
-        self.end_date = end_date
+    def __init__(self, tickers_list: list[str], dates_list: list[str], interval:str):
+        self.tickers_list = tickers_list
+        self.dates_list = dates_list
         self.interval = interval
         self.data = {}
 
-    def collect_data(self, ticker):
-        api_url = 'https://api.binance.com/api/v3/klines'
-        start_time = pd.Timestamp(self.start_date)
-        end_time = pd.Timestamp(self.end_date)
-        start = int(start_time.timestamp() * 1000)
-        end = int(end_time.timestamp() * 1000)
-        all_data = []
-        params = {
-            'symbol': ticker,
-            'interval': self.interval,
-            'limit': 1000
-        }
-        while start < end:
-            params['startTime'] = start
-            response = requests.get(api_url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                all_data.extend(data)
-                start = int(data[-1][0]) + 1
-            else:
-                print("Erreur lors de la récupération des données:", response.status_code)
-                return None
-        df = pd.DataFrame(all_data, columns=['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close Time',
-                                             'Quote Asset Volume', 'Number of Trades', 'Taker Buy Base Asset Volume',
-                                             'Taker Buy Quote Asset Volume', 'ignore'])
-        df['Open Time'] = pd.to_datetime(df['Open Time'], unit='ms')
-        df['Close Time'] = pd.to_datetime(df['Close Time'], unit='ms')
-        df.drop(['ignore'], axis=1, inplace=True)
-        df = df[(df['Open Time'] >= start_time) & (df['Open Time'] < end_time)]
-        return df
-
-    def collect_all_data(self):
-        for ticker in self.tickers:
-            self.data[ticker] = self.collect_data(ticker=f"{ticker}USDT")
+    def collect_APIdata(self):
+        url = "https://data-api.binance.vision/api/v3/klines"
+        start_date = datetime.strptime(self.dates_list[0], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        start_date = int(start_date.timestamp() * 1000)
+        end_date = datetime.strptime(self.dates_list[1], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        end_date = int(end_date.timestamp() * 1000)
+        for symbol in self.tickers_list:
+            params = {
+                'symbol': symbol,
+                'interval': self.interval,
+                'startTime': start_date,
+                'endTime': end_date
+            }
+            response = requests.get(url, params=params)
+            data = response.json()
+            df = pd.DataFrame(data, columns=['Open_time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close_time',
+                                             'Quote_volume', 'Nb_trades', 'ignore1', 'ignore2', 'ignore3'])
+            df['Dates'] = pd.to_datetime(df['Open_time'], unit='ms')
+            df = df[['Close']].set_index(df['Dates'])
+            self.data[symbol] = df
         return self.data
 
+#######################################       TEST       ##############################################################
 
 if __name__ == '__main__':
-    data_collector = DataCollector(tickers=['BTC', 'ETH'], start_date='2022-01-01', end_date='2023-01-01', interval='1h')
-    user_data = data_collector.collect_all_data()
+    data_collector = DataCollector(tickers_list=['ETHBTC', 'BNBETH'], dates_list=['2023-01-01', '2023-01-02'], interval='1d')
+    user_data = data_collector.collect_APIdata()
     print(user_data)
