@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "boreal-forest-416815",
+  "private_key_id": "c57cb5c11bdc4202623828e0105bf468908c5a6f",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDMm+UyXxVdCQha\nIQ0R8drCAp+imPAmwHjZvFV9VRGlpfuyVrKeaVEdA3sAZCsj5ettPbvRy7C/RZIZ\naFDXHp4/YYbhV9KiOyj2c4YzQNt7vW/j6U8gc1F8FzYc8R7Uxe1QJH7ERoKiIdqx\nBrqp+atJew5iBIoeyWJg9gdPusBq+SpLwiZ6YEGgTG86ak7G2hl7wm/xsrB3tgVT\nEvy2jju3B4dLxoB5S2Qj9qPnKefq4ojLMFHGo5ktiJI3fCULMjswB78CGXT65CBX\nI6E8Ud1X4L0XkVdqSbIDsao9q1QTBNpD6KpeJiArgCSP2b/wjxDX6LFvUlWvuxIX\neqgZvZmRAgMBAAECggEADqYKnrSX/vUql+lN2j8KfmFZtHZmmx+kh1IofLSectGT\nV41FdHntyLn7EGgbfpJzbHrC+54tpUQB1bfWMdCLW9ZLpc530g2SPTLAJOM703wY\niqSleZlH+C5hPWk1393bw6UZPkweBiWOVqY4rvqk/LnGqdXRXarlVDPJCjhAlmfn\nW2IYQXQqH4LQExu/1Z7V3UDH5lANEkRtsBekGhnABg4TRSNe2jsDYsAYmFiU7O+A\nurFLEMscmChMj3iQNAEzjNPwgCorpbW8901lbDHZifuXKH914TcdZiHosI6io/qE\nWmgxVxQuheXn8MQBuzVN2wUyttIlKImky4wCWA220QKBgQD/Ztr3AnVg8Of4Sajp\nUJQM8rlzi9/Q4MbBRK+6NE+frCoTd7Z+Znlive+BMruDVScdAD2tlGqHpjttaVI5\nCQHu7qLIfVW58PdR20V6cAtxqUqHvUwXTe5xie6AfB77BG5onIs/6OD1VagKgE4e\nevtvX2UoEc1jjQfwhCwl+eoGpwKBgQDNFpVdGyQUpRV7oxH8aXhF7bgsPhslTRYd\nnetu73vR9ZS0eLFKcW+1Ip5qC+H+JVAsKf3k5pd+CRuQMZ8i+Zm74rRUy1RvwE0f\n1QAodQRqmZLfXBeB+8iq6Rq+PttlWrENNhELV/FGOHeJp+HrRL4hWAwQBU1LeBky\nULLMGwWdBwKBgA5zR1hKb1G4z6cgo8nvoTDKWuvKsjMjRJuSw06JvyeNmiPX1h94\ntM19aZupvypDGx9s8BBuIUjjguFB4EER3WYjYlptnPgURin/egLfbAZWSb08XJ3E\n7wTFhRUH8MjLC2Qn10kaZ//5hLRzZfgbhTZb82E9AJ3tUNGu6MCNT0xpAoGAZOF/\n9T19gP43VArBtSR4OgWV+4VNOwrxHv5oKbh5cqzXSfK4WsLzzOjLfaR8tNPL3P2G\n20qmKCP4v/P4sG6QtX/tbmxaC2JPTaIrorr0wi7qtR4KnjCo45EoS36F0xRKVRJM\nTgUjNIRgIIFJOr4kvCggPt0syTu5QSu613VPTI8CgYB67lmc3H73mIyGHfevK5RJ\no+xc25n6rsvBbLhyrErGoM090UdlVK6L0A84SSdygl7j0zWtqJGJh2XG/GiRREWk\nw19OTOiaoe+u9TBMVKn674RUsSJVMjAGIoaufi9B/8WIDHqj0Farx9p41GFIQhJM\nBogxygO0em4aFo9KxLMLDA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "backtest-api@boreal-forest-416815.iam.gserviceaccount.com",
+  "client_id": "103136582587255275090",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/backtest-api%40boreal-forest-416815.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

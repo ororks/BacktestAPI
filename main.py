@@ -9,13 +9,11 @@ import json
 import Backtest
 from google.cloud import scheduler
 from google.oauth2 import service_account
-import google.cloud.storage
-import requests
 from google.cloud import storage
 
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
+
 app = FastAPI()
-
-
 class User_input(BaseModel):
     """
        Modèle de requête suivi par l'utilisateur :
@@ -28,6 +26,7 @@ class User_input(BaseModel):
        - interval : Fréquence des observations considérées.
        - amount : Montant initial du portefeuille.
        - rqt_name : Nom de la requête pour identification.
+       - repeat_frequency
 
        """
     func_strat: str
@@ -36,12 +35,13 @@ class User_input(BaseModel):
     dates_calibration: list[str]
     interval: str
     amount: str
-    rqt_name: str
-    # repeat_frequency: str
-
+    rqt_name : str
+    is_recurring: bool
+    repeat_frequency: str
 
 # Création de la route
 @app.post('/backtesting/')
+
 async def main(input: User_input):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
@@ -55,6 +55,11 @@ async def main(input: User_input):
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
+    if input.is_recurring is True:
+        input = input.copy(update={"is_recurring":False})
+        save_request_to_storage(input)
+        create_scheduler_job(input)
+
     data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
         user_data = data_collector.collect_APIdata()
@@ -73,20 +78,16 @@ async def main(input: User_input):
         json.dump(dico_df_json, file)
 
     # with open("user_request.json", "w") as file:
-    #     file.write(input)
+    #     file.write(input.json())
 
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
     # return type(result_json)
     result = pd.read_json(result_json, orient="index")
 
     stats_backtest = backtesting(result, user_data)
-    with open("stats_backtest.json", "w") as file:
-        json.dump(stats_backtest, file)
-
     os.remove(os.path.abspath("user_function.py"))
     os.remove(os.path.abspath("user_data.json"))
     return stats_backtest
-
 
 def create_venv(name, packages, funct):
     """
@@ -124,10 +125,91 @@ def backtesting(weights, dico_df):
     stats_bt = backtest.to_json()
     return stats_bt
 
-
 def run_subprocess(*args, **kwargs):
     try:
         result = subprocess.run(args, check=True, **kwargs)
         return result.stdout
     except subprocess.CalledProcessError as e:
         return f"Erreur dans l'éxécution du sous-processus : {e}"
+
+
+def frequency_to_cron(repeat_frequency):
+    # Dictionnaire de correspondance fréquence vers cron
+    frequency_cron_map = {
+        "1d": "0 0 * * *",  # À minuit chaque jour
+        "7d": "0 0 * * 1",  # À minuit tous les lundis (exemple pour "tous les 7 jours")
+        "1h": "0 * * * *"
+    }
+
+    # Pour les fréquences mensuelles, on gère séparément car il n'y a pas de code direct
+    if repeat_frequency == "1m":
+        return "0 0 1 * *"  # À minuit le premier jour de chaque mois
+
+    # Retourne la valeur cron correspondante ou une valeur par défaut si non trouvée
+    return frequency_cron_map.get(repeat_frequency, "0 0 * * *")  # Par défaut chaque jour à minuit
+
+
+# Exemple d'utilisation
+# repeat_frequency = "1d"  # Exemple d'entrée utilisateur
+# cron_schedule = frequency_to_cron(repeat_frequency)
+# print(cron_schedule)  # "0 0 * * *"
+
+def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_bucket", file_name="user_request.json"):
+    """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
+    # Transforme les données d'entrée en JSON
+    data_to_save = json.dumps(user_input.dict()).encode("utf-8")
+
+    # Crée une instance du client de stockage
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+
+    # Crée un nouvel objet blob dans le bucket
+    blob = bucket.blob(file_name)
+
+    # Télécharge les données dans le blob
+    blob.upload_from_string(data_to_save, content_type="application/json")
+
+    print(f"Les données ont été sauvegardées dans {file_name} dans le bucket {bucket_name}.")
+
+
+def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket", file_name="user_request.json"):
+    # Assurez-vous d'avoir importé les bibliothèques nécessaires et configuré les variables
+    # Supposons que 'input' est maintenant un objet avec les attributs nécessaires pour cette tâche
+
+    # Chemin vers votre fichier clé JSON pour l'authentification
+    credentials_path = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
+    credentials = service_account.Credentials.from_service_account_file(credentials_path)
+
+    # Paramètres du projet et de la tâche
+    project = 'boreal-forest-416815'
+    location = 'europe-west1'
+    parent = f'projects/{project}/locations/{location}'
+    job_name = f'{input.rqt_name}'  # Assurez-vous que cela est unique
+    frequency = frequency_to_cron(input.repeat_frequency)  # Fonction pour convertir la fréquence
+
+    # Client Cloud Scheduler
+    client = scheduler.CloudSchedulerClient(credentials=credentials)
+    # Configuration de l'URL de déclenchement de la fonction Cloud Functions
+    function_url = "https://us-central1-boreal-forest-416815.cloudfunctions.net/trigger_api"
+    # Création du corps de la requête, qui inclut le nom du bucket et le nom du fichier
+    body = json.dumps({"bucket_name": bucket_name, "file_name": file_name}).encode('utf-8')
+
+    # Configuration de la tâche
+    # Configuration de la tâche avec un nom explicite
+    job = {
+        'name': f'{parent}/jobs/{job_name}',  # Utilisation explicite du job_name
+        'http_target': {
+            'uri': function_url,
+            'http_method': scheduler.HttpMethod.POST,
+            'body': body,
+            'headers': {
+                'Content-Type': 'application/json'
+            },
+        },
+        'schedule': frequency,
+        'time_zone': 'Europe/Paris',
+    }
+
+    # Création de la tâche
+    response = client.create_job(request={"parent": parent, "job": job})
+    print("Tâche créée : ", response.name)
