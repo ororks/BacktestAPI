@@ -10,6 +10,7 @@ import Backtest
 from google.cloud import scheduler
 from google.oauth2 import service_account
 from google.cloud import storage
+from typing import Optional
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
 
@@ -39,7 +40,7 @@ class User_input(BaseModel):
     is_recurring: bool
     repeat_frequency: str
     nb_execution: int
-    current_execution_count: int
+    current_execution_count: Optional[int]=0
 
 # Création de la route
 @app.post('/backtesting/')
@@ -58,9 +59,9 @@ async def main(input: User_input):
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
     if input.is_recurring is True:
-            input = input.copy(update={"is_recurring":False})
-            save_request_to_storage(input)
-            create_scheduler_job(input)
+        input = input.copy(update={"is_recurring":False})
+        save_request_to_storage(input)
+        create_scheduler_job(input)
 
     data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
@@ -170,25 +171,22 @@ def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_buck
 
 
 def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
-    # Chemin vers votre fichier clé JSON pour l'authentification
+    # Votre code d'authentification reste le même
     credentials_path = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
     credentials = service_account.Credentials.from_service_account_file(credentials_path)
 
-    # Paramètres du projet et de la tâche
     project = 'boreal-forest-416815'
     location = 'europe-west1'
     parent = f'projects/{project}/locations/{location}'
     job_name = f'{input.rqt_name}'
     frequency = frequency_to_cron(input.repeat_frequency)
 
-    # Client Cloud Scheduler
     client = scheduler.CloudSchedulerClient(credentials=credentials)
-    # Configuration de l'URL de déclenchement de la fonction Cloud Functions
     function_url = "https://europe-west9-boreal-forest-416815.cloudfunctions.net/trigger_api"
-    # Création du corps de la requête, qui inclut le nom du bucket et le nom du fichier
-    body = json.dumps({"bucket_name": bucket_name, "file_name": job_name}).encode('utf-8')
 
-    # Configuration de la tâche
+    # Assurez-vous que le corps de la requête contient 'file_name' égal à input.rqt_name
+    body = json.dumps({"bucket_name": bucket_name, "file_name": input.rqt_name}).encode('utf-8')
+
     job = {
         'name': f'{parent}/jobs/{job_name}',
         'http_target': {
@@ -203,6 +201,6 @@ def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
         'time_zone': 'Europe/Paris',
     }
 
-    # Création de la tâche
+    # Créez la tâche avec le corps de la requête spécifié
     response = client.create_job(request={"parent": parent, "job": job})
     print("Tâche créée : ", response.name)
