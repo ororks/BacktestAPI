@@ -1,7 +1,7 @@
 import requests
 
-url = "http://127.0.0.1:8000/backtesting/"
-# url = "https://backtestapi.onrender.com/backtesting/"
+# url = "http://127.0.0.1:8000/backtesting/"
+url = "https://backtestapi.onrender.com/backtesting/"
 fonction_trading = """
 import pandas
 def func_strat(dfs_dict):
@@ -44,7 +44,10 @@ params = {
     "dates_test" : ["2023-01-01", "2024-01-01"],
     "interval": "1d",
     "amount": "10000",
-    "rqt_name": "rqt1"
+    "rqt_name": "requete_3",
+    "is_recurring": True,
+    "repeat_frequency": "1d",
+    "nb_execution": 4,
 }
 
 response = requests.post(url, json=params)
