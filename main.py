@@ -12,6 +12,7 @@ from google.oauth2 import service_account
 from google.cloud import storage
 from typing import Optional
 
+
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
 
 app = FastAPI()
@@ -199,6 +200,7 @@ def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
         },
         'schedule': frequency,
         'time_zone': 'Europe/Paris',
+        'attempt_deadline': "600s"
     }
 
     # Créez la tâche avec le corps de la requête spécifié
