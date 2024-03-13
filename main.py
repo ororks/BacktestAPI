@@ -35,9 +35,11 @@ class User_input(BaseModel):
     dates_calibration: list[str]
     interval: str
     amount: str
-    rqt_name : str
+    rqt_name: str
     is_recurring: bool
     repeat_frequency: str
+    nb_execution: int
+    current_execution_count: int
 
 # Création de la route
 @app.post('/backtesting/')
@@ -56,9 +58,9 @@ async def main(input: User_input):
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
     if input.is_recurring is True:
-        input = input.copy(update={"is_recurring":False})
-        save_request_to_storage(input)
-        create_scheduler_job(input)
+            input = input.copy(update={"is_recurring":False})
+            save_request_to_storage(input)
+            create_scheduler_job(input)
 
     data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
@@ -148,13 +150,7 @@ def frequency_to_cron(repeat_frequency):
     # Retourne la valeur cron correspondante ou une valeur par défaut si non trouvée
     return frequency_cron_map.get(repeat_frequency, "0 0 * * *")  # Par défaut chaque jour à minuit
 
-
-# Exemple d'utilisation
-# repeat_frequency = "1d"  # Exemple d'entrée utilisateur
-# cron_schedule = frequency_to_cron(repeat_frequency)
-# print(cron_schedule)  # "0 0 * * *"
-
-def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_bucket", file_name="user_request.json"):
+def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_bucket"):
     """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
     # Transforme les données d'entrée en JSON
     data_to_save = json.dumps(user_input.dict()).encode("utf-8")
@@ -164,6 +160,7 @@ def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_buck
     bucket = storage_client.bucket(bucket_name)
 
     # Crée un nouvel objet blob dans le bucket
+    file_name = user_input.rqt_name
     blob = bucket.blob(file_name)
 
     # Télécharge les données dans le blob
@@ -172,10 +169,7 @@ def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_buck
     print(f"Les données ont été sauvegardées dans {file_name} dans le bucket {bucket_name}.")
 
 
-def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket", file_name="user_request.json"):
-    # Assurez-vous d'avoir importé les bibliothèques nécessaires et configuré les variables
-    # Supposons que 'input' est maintenant un objet avec les attributs nécessaires pour cette tâche
-
+def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
     # Chemin vers votre fichier clé JSON pour l'authentification
     credentials_path = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
     credentials = service_account.Credentials.from_service_account_file(credentials_path)
@@ -184,20 +178,19 @@ def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket", fi
     project = 'boreal-forest-416815'
     location = 'europe-west1'
     parent = f'projects/{project}/locations/{location}'
-    job_name = f'{input.rqt_name}'  # Assurez-vous que cela est unique
-    frequency = frequency_to_cron(input.repeat_frequency)  # Fonction pour convertir la fréquence
+    job_name = f'{input.rqt_name}'
+    frequency = frequency_to_cron(input.repeat_frequency)
 
     # Client Cloud Scheduler
     client = scheduler.CloudSchedulerClient(credentials=credentials)
     # Configuration de l'URL de déclenchement de la fonction Cloud Functions
-    function_url = "https://us-central1-boreal-forest-416815.cloudfunctions.net/trigger_api"
+    function_url = "https://europe-west9-boreal-forest-416815.cloudfunctions.net/trigger_api"
     # Création du corps de la requête, qui inclut le nom du bucket et le nom du fichier
-    body = json.dumps({"bucket_name": bucket_name, "file_name": file_name}).encode('utf-8')
+    body = json.dumps({"bucket_name": bucket_name, "file_name": job_name}).encode('utf-8')
 
     # Configuration de la tâche
-    # Configuration de la tâche avec un nom explicite
     job = {
-        'name': f'{parent}/jobs/{job_name}',  # Utilisation explicite du job_name
+        'name': f'{parent}/jobs/{job_name}',
         'http_target': {
             'uri': function_url,
             'http_method': scheduler.HttpMethod.POST,
