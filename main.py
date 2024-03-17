@@ -12,6 +12,7 @@ from google.oauth2 import service_account
 from google.cloud import storage
 from typing import Optional, Any
 from google.api_core.exceptions import GoogleAPICallError, AlreadyExists
+from datetime import datetime, timedelta
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
 
@@ -171,7 +172,13 @@ def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_buck
     try:
         """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
         # Transforme les données d'entrée en JSON
-        data_to_save = json.dumps(user_input.dict()).encode("utf-8")
+        user_input_dict = user_input.dict()
+        dates = user_input_dict.get("dates")
+        date_fin = datetime.strptime(dates[1], "%Y-%m-%d")
+        date_fin = date_fin + timedelta(days=user_input.repeat_frequency)
+        dates[1] = date_fin.strftime("%Y-%m-%d")
+        user_input_dict["dates"] = dates
+        data_to_save = json.dumps(user_input_dict).encode("utf-8")
 
         # Crée une instance du client de stockage
         storage_client = storage.Client()
