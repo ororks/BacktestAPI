@@ -1,7 +1,6 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, ValidationError
-from pydantic.types import ConstrainedStr
+from pydantic import BaseModel
 from Data_collector import DataCollector
 import subprocess
 import sys
@@ -16,19 +15,21 @@ from google.api_core.exceptions import GoogleAPICallError, AlreadyExists
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
 
-class CustomDate(ConstrainedStr):
-    @classmethod
-    def parse(cls, value: Any)->int:
-        if not isinstance(value, str):
-            raise TypeError("le format string est requis")
-        if value.endswith("d"):
-            return int(value[:-1])
-        elif value.endswith("m"):
-            return int(value[:-1]) * 30
-        else:
-            raise ValueError("Format incorrecte")
+# class CustomDate(ConstrainedStr):
+#     @classmethod
+#     def parse(cls, value: Any)->int:
+#         if not isinstance(value, str):
+#             raise TypeError("le format string est requis")
+#         if value.endswith("d"):
+#             return int(value[:-1])
+#         elif value.endswith("m"):
+#             return int(value[:-1]) * 30
+#         else:
+#             raise ValueError("Format incorrecte")
+#
 
 app = FastAPI()
+
 class User_input(BaseModel):
     """
        Modèle de requête suivi par l'utilisateur :
@@ -52,9 +53,17 @@ class User_input(BaseModel):
     amount: str
     rqt_name: str
     is_recurring: bool
-    repeat_frequency: CustomDate
+    repeat_frequency: int
     nb_execution: int
     current_execution_count: Optional[int]=0
+
+    # @validator("repeat_frequency", pre=True, allow_reuse=True)
+    # def check_frequency(cls, v):
+    #     try:
+    #         return CustomDate.parse(v)
+    #     except ValueError as e:
+    #         raise ValueError(f"Fréquence de répétition invalide : {e}") from e
+
 
 # Création de la route
 @app.post('/backtesting/')
@@ -72,6 +81,7 @@ async def main(input: User_input):
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
+
     if input.is_recurring is True:
         input = input.copy(update={"is_recurring":False})
         save_request_to_storage(input)
@@ -102,6 +112,7 @@ async def main(input: User_input):
     os.remove(os.path.relpath("user_function.py", start=os.path.curdir))
     os.remove(os.path.relpath("user_data.json", start=os.path.curdir))
     return stats_backtest
+
 
 def create_venv(name, packages, funct):
     """
