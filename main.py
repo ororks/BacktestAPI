@@ -1,6 +1,7 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from pydantic.types import ConstrainedStr
 from Data_collector import DataCollector
 import subprocess
 import sys
@@ -10,10 +11,22 @@ import Backtest
 from google.cloud import scheduler
 from google.oauth2 import service_account
 from google.cloud import storage
-from typing import Optional
+from typing import Optional, Any
+from google.api_core.exceptions import GoogleAPICallError, AlreadyExists
 
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
+class CustomDate(ConstrainedStr):
+    @classmethod
+    def parse(cls, value: Any)->int:
+        if not isinstance(value, str):
+            raise TypeError("le format string est requis")
+        if value.endswith("d"):
+            return int(value[:-1])
+        elif value.endswith("m"):
+            return int(value[:-1]) * 30
+        else:
+            raise ValueError("Format incorrecte")
 
 app = FastAPI()
 class User_input(BaseModel):
@@ -34,12 +47,12 @@ class User_input(BaseModel):
     func_strat: str
     requirements: list[str]
     tickers: list[str]
-    dates_calibration: list[str]
+    dates: list[str]
     interval: str
     amount: str
     rqt_name: str
     is_recurring: bool
-    repeat_frequency: str
+    repeat_frequency: CustomDate
     nb_execution: int
     current_execution_count: Optional[int]=0
 
@@ -64,7 +77,7 @@ async def main(input: User_input):
         save_request_to_storage(input)
         create_scheduler_job(input)
 
-    data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
+    data_collector = DataCollector(input.tickers, input.dates, input.interval)
     try:
         user_data = data_collector.collect_APIdata()
     except HTTPException as e:
@@ -81,16 +94,13 @@ async def main(input: User_input):
     with open("user_data.json", "w") as file:
         json.dump(dico_df_json, file)
 
-    # with open("user_request.json", "w") as file:
-    #     file.write(input.json())
-
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
     # return type(result_json)
     result = pd.read_json(result_json, orient="index")
 
     stats_backtest = backtesting(result, user_data)
-    os.remove(os.path.abspath("user_function.py"))
-    os.remove(os.path.abspath("user_data.json"))
+    os.remove(os.path.relpath("user_function.py", start=os.path.curdir))
+    os.remove(os.path.relpath("user_data.json", start=os.path.curdir))
     return stats_backtest
 
 def create_venv(name, packages, funct):
@@ -117,12 +127,11 @@ def create_venv(name, packages, funct):
         run_subprocess(pip_route, "install", package)
     #
     python_executable = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "python")
-    function_path = os.path.abspath(funct)
-    wrapper_path = os.path.abspath("script_wrapper.py")
-    data_path = os.path.abspath("user_data.json")
+    function_path = os.path.relpath(funct, start=os.path.curdir)
+    wrapper_path = os.path.relpath("script_wrapper.py", start=os.path.curdir)
+    data_path = os.path.relpath("user_data.json", start=os.path.curdir)
     response = run_subprocess(python_executable, wrapper_path, data_path, function_path, capture_output=True, text=True)
     return response
-
 
 def backtesting(weights, dico_df):
     backtest = Backtest.Stats(weights, dico_df)
@@ -137,43 +146,41 @@ def run_subprocess(*args, **kwargs):
         return f"Erreur dans l'éxécution du sous-processus : {e}"
 
 
-def frequency_to_cron(repeat_frequency):
-    # Dictionnaire de correspondance fréquence vers cron
-    frequency_cron_map = {
-        "1d": "0 0 * * *",  # À minuit chaque jour
-        "7d": "0 0 * * 1",  # À minuit tous les lundis (exemple pour "tous les 7 jours")
-        "1h": "0 * * * *"
-    }
-
-    # Pour les fréquences mensuelles, on gère séparément car il n'y a pas de code direct
-    if repeat_frequency == "1m":
+def frequency_to_cron(repeat_frequency_days):
+    if repeat_frequency_days == 1:
+        return "0 0 * * *"  # À minuit chaque jour
+    elif repeat_frequency_days == 7:
+        return "0 0 * * 1"  # À minuit tous les lundis
+    elif repeat_frequency_days == 30:
         return "0 0 1 * *"  # À minuit le premier jour de chaque mois
-
-    # Retourne la valeur cron correspondante ou une valeur par défaut si non trouvée
-    return frequency_cron_map.get(repeat_frequency, "0 0 * * *")  # Par défaut chaque jour à minuit
+    else:
+        raise ValueError("La fréquence spécifiée n'est pas supportée en format cron")
 
 def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_bucket"):
-    """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
-    # Transforme les données d'entrée en JSON
-    data_to_save = json.dumps(user_input.dict()).encode("utf-8")
+    try:
+        """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
+        # Transforme les données d'entrée en JSON
+        data_to_save = json.dumps(user_input.dict()).encode("utf-8")
 
-    # Crée une instance du client de stockage
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
+        # Crée une instance du client de stockage
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
 
-    # Crée un nouvel objet blob dans le bucket
-    file_name = user_input.rqt_name
-    blob = bucket.blob(file_name)
+        # Crée un nouvel objet blob dans le bucket
+        file_name = user_input.rqt_name
+        blob = bucket.blob(file_name)
 
-    # Télécharge les données dans le blob
-    blob.upload_from_string(data_to_save, content_type="application/json")
+        # Télécharge les données dans le blob
+        blob.upload_from_string(data_to_save, content_type="application/json")
 
-    print(f"Les données ont été sauvegardées dans {file_name} dans le bucket {bucket_name}.")
+        print(f"Les données ont été sauvegardées dans {file_name} dans le bucket {bucket_name}.")
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde des données dans Cloud Storage: {e}")
 
 
 def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
     # Votre code d'authentification reste le même
-    credentials_path = os.path.abspath("boreal-forest-416815-c57cb5c11bdc.json")
+    credentials_path = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
     credentials = service_account.Credentials.from_service_account_file(credentials_path)
 
     project = 'boreal-forest-416815'
@@ -203,6 +210,16 @@ def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
         'attempt_deadline': "600s"
     }
 
-    # Créez la tâche avec le corps de la requête spécifié
-    response = client.create_job(request={"parent": parent, "job": job})
-    print("Tâche créée : ", response.name)
+    try:
+        response = client.create_job(request={"parent": parent, "job": job})
+        print("Tâche créée : ", response.name)
+        return response
+    except AlreadyExists as e:
+        print(f"Erreur : La tâche existe déjà - {e}")
+        # Gérer le cas où la tâche existe déjà, si nécessaire.
+    except GoogleAPICallError as e:
+        print(f"Erreur lors de l'appel à l'API : {e}")
+        # Gérer les erreurs d'appel API (erreurs réseau, erreurs de serveur, etc.)
+    except Exception as e:
+        print(f"Erreur inattendue : {e}")
+        # Gérer toutes les autres exceptions inattendues.
