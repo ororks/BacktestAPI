@@ -29,7 +29,6 @@ class User_input(BaseModel):
        - func_strat : La fonction de trading en str renvoyant un poids pour chaque actif à chaque date.
        - requirements : Liste des imports nécessaires.
        - tickers : Liste des tickers considérés.
-       - dates_calibration : Dates pour calibrer la fonction de stratégie.
        - dates_test : Dates sur lesquelles on teste la stratégie de trading.
        - interval : Fréquence des observations considérées.
        - amount : Montant initial du portefeuille.
@@ -53,7 +52,9 @@ class User_input(BaseModel):
 def check_scheduler(user_input: User_input = Depends()) -> User_input:
     """
     Dépendance qui check si la requête de l'utilisateur précise une
-    reprogrammation du backtest à des dates futures.
+    reprogrammation du backtest à des dates futures. Si c'est le cas,
+    is_recurring est passé en False pour que chaque réexecution depuis
+    google cloud ne programme pas elle même des réexécution.
     """
     if user_input.is_recurring:
         modified_input = user_input.copy(update={"is_recurring": False})
@@ -70,16 +71,14 @@ class CustomMiddleware(BaseHTTPMiddleware):
             re.compile(r"exec\s*\("),
             re.compile(r"subprocess\.[a-zA-Z0-9_]"),
         ]
-        response = await request.body()
-        body = response.decode("utf-8")
-        if any(pattern.search(body) for pattern in disallowed_patterns):
+        response_check = await request.json()
+        func_strat_text = response_check.get("func_strat")
+        if any(pattern.search(func_strat_text) for pattern in disallowed_patterns):
             return JSONResponse(status_code=400, content={"Détails":"La requête contient des éléments dangereux."})
         response = await call_next(request)
         return response
 
-
 app.add_middleware(CustomMiddleware)
-
 
 # Création de la route
 @app.post('/backtesting/')
@@ -161,8 +160,8 @@ class BacktestHandler:
         function_path = os.path.relpath(self.user_input.func_strat, start=os.path.curdir)
         wrapper_path = os.path.relpath("script_wrapper.py", start=os.path.curdir)
         data_path = os.path.relpath("user_data.json", start=os.path.curdir)
-        response = self.run_subprocess(python_executable, wrapper_path, data_path, function_path, capture_output=True,
-                                  text=True)
+        response = self.run_subprocess(python_executable, wrapper_path, data_path, function_path,
+                                       capture_output=True, text=True)
         return response
 
     def run_subprocess(*args, **kwargs):
