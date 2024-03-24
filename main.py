@@ -116,10 +116,13 @@ class BacktestHandler:
     @staticmethod
     def run_subprocess(*args, **kwargs):
         try:
-            result = subprocess.run(args, check=True, **kwargs)
+            result = subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                    **kwargs)
+            if result.stderr:
+                print(f"Subprocess stderr: {result.stderr}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            return f"Erreur dans l'éxécution du sous-processus : {e}"
+            raise RuntimeError(f"Subprocess failed: {e.stderr}") from e
 
     def run_backtest(self):
         # Save du dataframe en json
