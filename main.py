@@ -115,8 +115,11 @@ class BacktestHandler:
 
     @staticmethod
     def run_subprocess(*args, **kwargs):
+        kwargs.setdefault('text', True)
+        kwargs.setdefault('stdout', subprocess.PIPE)
+        kwargs.setdefault('stderr', subprocess.PIPE)
         try:
-            result = subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+            result = subprocess.run(args, check=True, **kwargs)
             if result.stderr:
                 print(f"Subprocess stderr: {result.stderr}")
             return result.stdout
@@ -167,8 +170,7 @@ class BacktestHandler:
         function_path = os.path.relpath("user_function.py", start=os.path.curdir)
         wrapper_path = os.path.relpath("script_wrapper.py", start=os.path.curdir)
         data_path = os.path.relpath("user_data.json", start=os.path.curdir)
-        response = BacktestHandler.run_subprocess(python_executable, wrapper_path, data_path, function_path,
-                                                  capture_output=True, text=True)
+        response = BacktestHandler.run_subprocess(python_executable, wrapper_path, data_path, function_path, text=True)
         return response
 
     def backtesting(self, weights, dico_df):
