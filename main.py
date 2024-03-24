@@ -13,7 +13,7 @@ import Backtest
 from google.cloud import scheduler
 from google.oauth2 import service_account
 from google.cloud import storage
-from typing import Optional, Any
+from typing import Optional
 from google.api_core.exceptions import GoogleAPICallError, AlreadyExists
 from datetime import datetime, timedelta
 import re
@@ -22,7 +22,8 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.relpath("boreal-forest-41
 
 app = FastAPI()
 
-class User_input(BaseModel):
+class UserInput(BaseModel):
+
     """
        Modèle de requête suivi par l'utilisateur :
 
@@ -48,39 +49,38 @@ class User_input(BaseModel):
     nb_execution: int
     current_execution_count: Optional[int]=0
 
-
-def check_scheduler(user_input: User_input = Depends()) -> User_input:
-    """
-    Dépendance qui check si la requête de l'utilisateur précise une
-    reprogrammation du backtest à des dates futures. Si c'est le cas,
-    is_recurring est passé en False pour que chaque réexecution depuis
-    google cloud ne programme pas elle même des réexécution.
-    """
-    if user_input.is_recurring:
-        modified_input = user_input.copy(update={"is_recurring": False})
-        scheduler = CloudScheduler(modified_input)
-        scheduler.save_request_to_storage()
-        scheduler.create_scheduler_job()
-        return modified_input
-    return user_input
-
-
-async def check_security(request: Request):
-    disallowed_patterns = [
-        re.compile(r"exec\s*\("),
-        re.compile(r"subprocess\.[a-zA-Z0-9_]"),
-    ]
-    response_check = await request.json()
-    func_strat_text = response_check.get("func_strat", "")
-    if any(pattern.search(func_strat_text) for pattern in disallowed_patterns):
-        raise HTTPException(status_code=400, detail="La requête contient des éléments dangereux.")
-    return
+#
+# def check_scheduler(user_input: UserInput = Depends()) -> UserInput:
+#     """
+#     Dépendance qui check si la requête de l'utilisateur précise une
+#     reprogrammation du backtest à des dates futures. Si c'est le cas,
+#     is_recurring est passé en False pour que chaque réexecution depuis
+#     google cloud ne programme pas elle même des réexécution.
+#     """
+#     if user_input.is_recurring:
+#         modified_input = user_input.copy(update={"is_recurring": False})
+#         scheduler = CloudScheduler(modified_input)
+#         scheduler.save_request_to_storage()
+#         scheduler.create_scheduler_job()
+#         return modified_input
+#     return user_input
+#
+#
+# async def check_security(request: Request):
+#     disallowed_patterns = [
+#         re.compile(r"exec\s*\("),
+#         re.compile(r"subprocess\.[a-zA-Z0-9_]"),
+#     ]
+#     response_check = await request.json()
+#     func_strat_text = response_check.get("func_strat", "")
+#     if any(pattern.search(func_strat_text) for pattern in disallowed_patterns):
+#         raise HTTPException(status_code=400, detail="La requête contient des éléments dangereux.")
+#     return
 
 
 # Création de la route
 @app.post('/backtesting/')
-async def main(input: User_input = Depends(check_scheduler),
-               security_check:None = Depends(check_security)):
+async def main(input: UserInput):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
     :return: Les statistiques de backtest obtenues -> json
@@ -108,7 +108,7 @@ async def main(input: User_input = Depends(check_scheduler),
 
 class BacktestHandler:
     def __init__(self,
-                 user_input: User_input,
+                 user_input: UserInput,
                  data: pd.DataFrame):
         self.user_input = user_input
         self.data = data
@@ -176,7 +176,7 @@ class BacktestHandler:
 
 class CloudScheduler:
     def __init__(self,
-                 user_input: User_input):
+                 user_input: UserInput):
         self.user_input = user_input
 
 
