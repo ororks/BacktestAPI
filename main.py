@@ -116,8 +116,7 @@ class BacktestHandler:
     @staticmethod
     def run_subprocess(*args, **kwargs):
         try:
-            result = subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                    **kwargs)
+            result = subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
             if result.stderr:
                 print(f"Subprocess stderr: {result.stderr}")
             return result.stdout
