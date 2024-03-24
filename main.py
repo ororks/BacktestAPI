@@ -164,7 +164,7 @@ class BacktestHandler:
             BacktestHandler.run_subprocess(pip_route, "install", package)
 
         python_executable = os.path.join(self.user_input.rqt_name, "Scripts" if os.name == "nt" else "bin", "python")
-        function_path = os.path.relpath(self.user_input.func_strat, start=os.path.curdir)
+        function_path = os.path.relpath("user_function.py", start=os.path.curdir)
         wrapper_path = os.path.relpath("script_wrapper.py", start=os.path.curdir)
         data_path = os.path.relpath("user_data.json", start=os.path.curdir)
         response = BacktestHandler.run_subprocess(python_executable, wrapper_path, data_path, function_path,
