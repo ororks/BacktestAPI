@@ -65,25 +65,22 @@ def check_scheduler(user_input: User_input = Depends()) -> User_input:
     return user_input
 
 
-class CustomMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        disallowed_patterns = [
-            re.compile(r"exec\s*\("),
-            re.compile(r"subprocess\.[a-zA-Z0-9_]"),
-        ]
-        response_check = await request.json()
-        func_strat_text = response_check.get("func_strat")
-        if any(pattern.search(func_strat_text) for pattern in disallowed_patterns):
-            return JSONResponse(status_code=400, content={"Détails":"La requête contient des éléments dangereux."})
-        response = await call_next(request)
-        return response
+async def check_security(request: Request):
+    disallowed_patterns = [
+        re.compile(r"exec\s*\("),
+        re.compile(r"subprocess\.[a-zA-Z0-9_]"),
+    ]
+    response_check = await request.json()
+    func_strat_text = response_check.get("func_strat", "")
+    if any(pattern.search(func_strat_text) for pattern in disallowed_patterns):
+        raise HTTPException(status_code=400, detail="La requête contient des éléments dangereux.")
+    return
 
-app.add_middleware(CustomMiddleware)
 
 # Création de la route
 @app.post('/backtesting/')
-
-async def main(input: User_input = Depends(check_scheduler)):
+async def main(input: User_input = Depends(check_scheduler),
+               security_check:None = Depends(check_security)):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
     :return: Les statistiques de backtest obtenues -> json
