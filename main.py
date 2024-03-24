@@ -62,26 +62,9 @@ async def check_security(request: Request):
     return
 
 
-def check_scheduler(user_input: UserInput = Depends()) -> UserInput:
-    """
-    Dépendance qui check si la requête de l'utilisateur précise une
-    reprogrammation du backtest à des dates futures. Si c'est le cas,
-    is_recurring est passé en False pour que chaque réexecution depuis
-    google cloud ne programme pas elle même des réexécution.
-    """
-    if user_input.is_recurring:
-        modified_input = user_input.copy(update={"is_recurring": False})
-        scheduler = CloudScheduler(modified_input)
-        scheduler.save_request_to_storage()
-        scheduler.create_scheduler_job()
-        return modified_input
-    return user_input
-
-
 # Création de la route
 @app.post('/backtesting/')
-async def main(input: UserInput = Depends(check_scheduler),
-               security_check: None=Depends(check_security)):
+async def main(input: UserInput, security_check: None=Depends(check_security)):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
     :return: Les statistiques de backtest obtenues -> json
@@ -94,6 +77,11 @@ async def main(input: UserInput = Depends(check_scheduler),
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
+    if input.is_recurring:
+        modified_input = input.copy(update={"is_recurring": False})
+        scheduler = CloudScheduler(modified_input)
+        scheduler.save_request_to_storage()
+        scheduler.create_scheduler_job()
 
     data_collector = DataCollector(input.tickers, input.dates, input.interval)
     try:
