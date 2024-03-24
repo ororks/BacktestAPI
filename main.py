@@ -7,29 +7,10 @@ import sys
 import os
 import json
 import Backtest
-from google.cloud import scheduler
-from google.oauth2 import service_account
-from google.cloud import storage
-from typing import Optional, Any
-from google.api_core.exceptions import GoogleAPICallError, AlreadyExists
-from datetime import datetime, timedelta
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
-
-# class CustomDate(ConstrainedStr):
-#     @classmethod
-#     def parse(cls, value: Any)->int:
-#         if not isinstance(value, str):
-#             raise TypeError("le format string est requis")
-#         if value.endswith("d"):
-#             return int(value[:-1])
-#         elif value.endswith("m"):
-#             return int(value[:-1]) * 30
-#         else:
-#             raise ValueError("Format incorrecte")
-#
 
 app = FastAPI()
+
 
 class User_input(BaseModel):
     """
@@ -43,32 +24,20 @@ class User_input(BaseModel):
        - interval : Fréquence des observations considérées.
        - amount : Montant initial du portefeuille.
        - rqt_name : Nom de la requête pour identification.
-       - repeat_frequency
 
        """
     func_strat: str
     requirements: list[str]
     tickers: list[str]
-    dates: list[str]
+    dates_calibration: list[str]
     interval: str
     amount: str
     rqt_name: str
-    is_recurring: bool
-    repeat_frequency: int
-    nb_execution: int
-    current_execution_count: Optional[int]=0
-
-    # @validator("repeat_frequency", pre=True, allow_reuse=True)
-    # def check_frequency(cls, v):
-    #     try:
-    #         return CustomDate.parse(v)
-    #     except ValueError as e:
-    #         raise ValueError(f"Fréquence de répétition invalide : {e}") from e
+    # repeat_frequency: str
 
 
 # Création de la route
 @app.post('/backtesting/')
-
 async def main(input: User_input):
     """
     :param input: Données utilisateurs spécifiées dans le modèle User_input.
@@ -82,13 +51,7 @@ async def main(input: User_input):
         par l'utilisateur. Run de sa fonction dans ce venv et récupération de l'output.
     - Appel de la fonction backtesting pour récupérer les statistiques.
     """
-
-    if input.is_recurring is True:
-        input = input.copy(update={"is_recurring":False})
-        save_request_to_storage(input)
-        create_scheduler_job(input)
-
-    data_collector = DataCollector(input.tickers, input.dates, input.interval)
+    data_collector = DataCollector(input.tickers, input.dates_calibration, input.interval)
     try:
         user_data = data_collector.collect_APIdata()
     except HTTPException as e:
@@ -104,6 +67,9 @@ async def main(input: User_input):
     # Serialisation du dico en json et save dans un fichier
     with open("user_data.json", "w") as file:
         json.dump(dico_df_json, file)
+
+    # with open("user_request.json", "w") as file:
+    #     file.write(input.json())
 
     result_json = create_venv(input.rqt_name, input.requirements, "user_function.py")
     # return type(result_json)
@@ -132,6 +98,7 @@ def create_venv(name, packages, funct):
     run_subprocess(sys.executable, "-m", "venv", name)
 
     # Création du chemin vers le pip executable pour l'env virtuel
+
     pip_route = os.path.join(name, "Scripts" if os.name == "nt" else "bin", "pip")
 
     # Installation des packages
@@ -145,10 +112,12 @@ def create_venv(name, packages, funct):
     response = run_subprocess(python_executable, wrapper_path, data_path, function_path, capture_output=True, text=True)
     return response
 
+
 def backtesting(weights, dico_df):
     backtest = Backtest.Stats(weights, dico_df)
     stats_bt = backtest.to_json()
     return stats_bt
+
 
 def run_subprocess(*args, **kwargs):
     try:
@@ -156,88 +125,3 @@ def run_subprocess(*args, **kwargs):
         return result.stdout
     except subprocess.CalledProcessError as e:
         return f"Erreur dans l'éxécution du sous-processus : {e}"
-
-
-def frequency_to_cron(repeat_frequency_days):
-    if repeat_frequency_days == 1:
-        return "0 0 * * *"  # À minuit chaque jour
-    elif repeat_frequency_days == 7:
-        return "0 0 * * 1"  # À minuit tous les lundis
-    elif repeat_frequency_days == 30:
-        return "0 0 1 * *"  # À minuit le premier jour de chaque mois
-    else:
-        raise ValueError("La fréquence spécifiée n'est pas supportée en format cron")
-
-def save_request_to_storage(user_input:User_input, bucket_name="backtestapi_bucket"):
-    try:
-        """Sauvegarde la requête de l'utilisateur dans un fichier JSON sur Cloud Storage."""
-        # Transforme les données d'entrée en JSON
-        user_input_dict = user_input.dict()
-        dates = user_input_dict.get("dates")
-        date_fin = datetime.strptime(dates[1], "%Y-%m-%d")
-        date_fin = date_fin + timedelta(days=user_input.repeat_frequency)
-        dates[1] = date_fin.strftime("%Y-%m-%d")
-        user_input_dict["dates"] = dates
-        data_to_save = json.dumps(user_input_dict).encode("utf-8")
-
-        # Crée une instance du client de stockage
-        storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name)
-
-        # Crée un nouvel objet blob dans le bucket
-        file_name = user_input.rqt_name
-        blob = bucket.blob(file_name)
-
-        # Télécharge les données dans le blob
-        blob.upload_from_string(data_to_save, content_type="application/json")
-
-        print(f"Les données ont été sauvegardées dans {file_name} dans le bucket {bucket_name}.")
-    except Exception as e:
-        print(f"Erreur lors de la sauvegarde des données dans Cloud Storage: {e}")
-
-
-def create_scheduler_job(input: User_input, bucket_name="backtestapi_bucket"):
-    # Votre code d'authentification reste le même
-    credentials_path = os.path.relpath("boreal-forest-416815-c57cb5c11bdc.json", start=os.path.curdir)
-    credentials = service_account.Credentials.from_service_account_file(credentials_path)
-
-    project = 'boreal-forest-416815'
-    location = 'europe-west1'
-    parent = f'projects/{project}/locations/{location}'
-    job_name = f'{input.rqt_name}'
-    frequency = frequency_to_cron(input.repeat_frequency)
-
-    client = scheduler.CloudSchedulerClient(credentials=credentials)
-    function_url = "https://europe-west9-boreal-forest-416815.cloudfunctions.net/trigger_api"
-
-    # Assurez-vous que le corps de la requête contient 'file_name' égal à input.rqt_name
-    body = json.dumps({"bucket_name": bucket_name, "file_name": input.rqt_name}).encode('utf-8')
-
-    job = {
-        'name': f'{parent}/jobs/{job_name}',
-        'http_target': {
-            'uri': function_url,
-            'http_method': scheduler.HttpMethod.POST,
-            'body': body,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-        },
-        'schedule': frequency,
-        'time_zone': 'Europe/Paris',
-        'attempt_deadline': "600s"
-    }
-
-    try:
-        response = client.create_job(request={"parent": parent, "job": job})
-        print("Tâche créée : ", response.name)
-        return response
-    except AlreadyExists as e:
-        print(f"Erreur : La tâche existe déjà - {e}")
-        # Gérer le cas où la tâche existe déjà, si nécessaire.
-    except GoogleAPICallError as e:
-        print(f"Erreur lors de l'appel à l'API : {e}")
-        # Gérer les erreurs d'appel API (erreurs réseau, erreurs de serveur, etc.)
-    except Exception as e:
-        print(f"Erreur inattendue : {e}")
-        # Gérer toutes les autres exceptions inattendues.
