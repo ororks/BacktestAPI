@@ -113,6 +113,14 @@ class BacktestHandler:
         self.user_input = user_input
         self.data = data
 
+    @staticmethod
+    def run_subprocess(*args, **kwargs):
+        try:
+            result = subprocess.run(args, check=True, **kwargs)
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            return f"Erreur dans l'éxécution du sous-processus : {e}"
+
     def run_backtest(self):
         # Save du dataframe en json
         with open("user_function.py", "w") as file:
@@ -144,34 +152,28 @@ class BacktestHandler:
             Récupération des résultats de la fonction utilisateur par ce sous-processus -> pd.DataFrame
         """
         # Création de l'environnement virtuel
-        self.run_subprocess(sys.executable, "-m", "venv", self.user_input.rqt_name)
+        BacktestHandler.run_subprocess(sys.executable, "-m", "venv", self.user_input.rqt_name)
 
         # Création du chemin vers le pip executable pour l'env virtuel
         pip_route = os.path.join(self.user_input.rqt_name, "Scripts" if os.name == "nt" else "bin", "pip")
 
         # Installation des packages
         for package in self.user_input.requirements:
-            self.run_subprocess(pip_route, "install", package)
+            BacktestHandler.run_subprocess(pip_route, "install", package)
 
         python_executable = os.path.join(self.user_input.rqt_name, "Scripts" if os.name == "nt" else "bin", "python")
         function_path = os.path.relpath(self.user_input.func_strat, start=os.path.curdir)
         wrapper_path = os.path.relpath("script_wrapper.py", start=os.path.curdir)
         data_path = os.path.relpath("user_data.json", start=os.path.curdir)
-        response = self.run_subprocess(python_executable, wrapper_path, data_path, function_path,
-                                       capture_output=True, text=True)
+        response = BacktestHandler.run_subprocess(python_executable, wrapper_path, data_path, function_path,
+                                                  capture_output=True, text=True)
         return response
-
-    def run_subprocess(*args, **kwargs):
-        try:
-            result = subprocess.run(args, check=True, **kwargs)
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            return f"Erreur dans l'éxécution du sous-processus : {e}"
 
     def backtesting(self, weights, dico_df):
         backtest = Backtest.Stats(weights, dico_df)
         stats_bt = backtest.to_json()
         return stats_bt
+
 
 
 class CloudScheduler:
@@ -260,3 +262,4 @@ class CloudScheduler:
         except Exception as e:
             print(f"Erreur inattendue : {e}")
             # Gérer toutes les autres exceptions inattendues.
+
