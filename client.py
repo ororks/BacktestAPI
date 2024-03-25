@@ -43,7 +43,7 @@ params = {
     "dates": ["2022-01-01", "2023-01-07"],
     "interval": "1d",
     "amount": "10000",
-    "rqt_name": "Roman_rqt3",
+    "request_id": "Roman_rqt3",
     "is_recurring": True,
     "repeat_frequency": 7,
     "nb_execution": 4,
