@@ -1,4 +1,4 @@
-from main import UserInput
+
 from datetime import datetime, timedelta
 from google.cloud import scheduler
 from google.oauth2 import service_account
@@ -17,7 +17,7 @@ class CloudScheduler:
     ainsi l'exécution récurrente des requêtes de backtesting de stratégies de trading à des intervalles prédéfinis.
     """
     def __init__(self,
-                 user_input: UserInput):
+                 user_input):
         self.user_input = user_input
 
 

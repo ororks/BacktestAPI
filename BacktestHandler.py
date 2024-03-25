@@ -1,5 +1,4 @@
 import Backtest
-from main import UserInput
 import pandas as pd
 import subprocess
 import os
@@ -13,7 +12,7 @@ class BacktestHandler:
     environnement virtuel sécurisé pour évaluer sa performance.
     """
     def __init__(self,
-                 user_input: UserInput,
+                 user_input,
                  data: pd.DataFrame):
         self.user_input = user_input
         self.data = data
