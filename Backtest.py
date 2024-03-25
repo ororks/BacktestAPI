@@ -2,6 +2,12 @@ import json
 import numpy as np
 import pandas as pd
 class Stats:
+    """
+    La classe Stats est conçue pour calculer et fournir des statistiques de performance
+    pour une stratégie de trading sur les données financières. Elle utilise les poids de la
+    stratégie et les données des actifs pour calculer différents indicateurs de performance,
+    tels que le rendement annuel, la volatilité, le ratio de Sharpe, et plus encore.
+    """
     def __init__(self, poids_ts, dfs_dict):
         self.poids_ts = poids_ts
         self.dfs_dict = dfs_dict
@@ -11,6 +17,11 @@ class Stats:
         self.setup_metrics()
 
     def calculate_returns_from_dfs(self):
+        """
+        Description : Calcule les rendements à partir des DataFrames des prix de clôture des actifs.
+
+        Renvoie : Un DataFrame des rendements calculés pour chaque actif.
+        """
         df_closes = pd.DataFrame()
         df_concat = pd.DataFrame()
         for key, df in self.dfs_dict.items():
@@ -22,6 +33,12 @@ class Stats:
         return df_returns
 
     def calculate_index_returns(self):
+        """
+        Description : Calcule les rendements de l'indice composé, basés sur
+                    les poids de la stratégie et les rendements des actifs.
+
+        Renvoie : Un DataFrame contenant les rendements de l'indice pour chaque période.
+        """
         df_returns = self.calculate_returns_from_dfs()
         df_poids = self.poids_ts.reset_index(drop=True)
         df_index_returns = (df_returns * df_poids).sum(axis=1)
@@ -30,6 +47,13 @@ class Stats:
         #return df_returns
 
     def setup_metrics(self):
+        """
+        Description : Initialise les métriques de performance en calculant différentes statistiques
+                        basées sur les rendements de l'indice.
+
+        Rôle : Calcule et stocke les indicateurs clés de performance, comme le rendement annuel,
+        la volatilité annuelle, le ratio de Sharpe, et d'autres statistiques.
+        """
         self.r_annual = self.annualize_rets(self.r_indice, self.scale)
         self.vol_annual = self.annualize_vol()
         self.sharpe_r = self.sharpe_ratio()
@@ -88,6 +112,11 @@ class Stats:
         return self.r_annual / -self.max_draw
 
     def to_json(self):
+        """
+        Description : Convertit les statistiques de performance calculées en une chaîne JSON formatée.
+
+        Renvoie : Une chaîne JSON contenant toutes les métriques de performance calculées par l'instance Stats.
+        """
         stats_dict = {
             'Rendement Annuel': self.r_annual.item() if isinstance(self.r_annual, pd.Series) else self.r_annual,
             'Volatilite Annuelle': self.vol_annual.item() if isinstance(self.vol_annual,

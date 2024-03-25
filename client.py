@@ -1,17 +1,17 @@
 import requests
 
-# url = "http://127.0.0.1:8000/backtesting/"
 url = "https://backtestapi.onrender.com/backtesting/"
 fonction_trading = """
-import pandas
+import pandas as pd
+import scipy
 def func_strat(dfs_dict):
-    df_returns = pandas.DataFrame()
+    df_returns = pd.DataFrame()
     for key, df in dfs_dict.items():
         df_returns[key] = df["Close"]
     df_returns = df_returns.pct_change().fillna(0)
     nb_actifs = len(df_returns.columns)
     pond = {col: 1.0 / nb_actifs for col in df_returns.columns}
-    poids_ts = pandas.DataFrame(index=df_returns.index, columns=df_returns.columns)
+    poids_ts = pd.DataFrame(index=df_returns.index, columns=df_returns.columns)
 
     changement_pond = 0.1
 
@@ -38,15 +38,14 @@ def func_strat(dfs_dict):
 
 params = {
     "func_strat": fonction_trading,
-    "requirements": ["pandas"],
+    "requirements": ["pandas", "scipy"],
     "tickers": ["ETHBTC", "BNBETH"],
-    "dates_calibration": ["2022-01-01", "2023-01-07"],
-    "dates_test" : ["2023-01-01", "2024-01-01"],
+    "dates": ["2022-01-01", "2023-01-07"],
     "interval": "1d",
     "amount": "10000",
-    "rqt_name": "requete_3",
+    "rqt_name": "Roman_rqt3",
     "is_recurring": True,
-    "repeat_frequency": "1d",
+    "repeat_frequency": 7,
     "nb_execution": 4,
 }
 
