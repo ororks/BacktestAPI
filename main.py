@@ -1,3 +1,6 @@
+import json
+
+import google.cloud.exceptions
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
@@ -8,6 +11,7 @@ from Data_collector import DataCollector
 from BacktestHandler import BacktestHandler
 from Cloudscheduler import CloudScheduler
 from typing import Optional
+from google.cloud import storage
 import os
 import re
 
@@ -111,3 +115,21 @@ async def main(input: UserInput, security_check: None=Depends(check_security)):
     stats_backtest = backtest_handler.run_backtest()
 
     return stats_backtest
+
+storage = storage.Client()
+bucket_name = "results_api"
+bucket = storage.bucket(bucket_name)
+
+@app.get('/get_result')
+async def main_get_results(request_id: str):
+    blob = bucket.blob(f"{request_id}.json")
+
+    try:
+        results = blob.download_as_text()
+    except google.cloud.exceptions.NotFound:
+        raise HTTPException(status_code=404, detail='Résultats non trouvés')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Erreur : {str(e)}')
+
+    return json.loads(results)
+
