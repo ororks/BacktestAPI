@@ -7,6 +7,11 @@ https://backtestapi.onrender.com/redoc
 
 ### Description
 Réalise le backtest d'une fonction de stratégie de trading propre à l'utilisateur sur données de bougies de crypto-actifs.
+Le fichier client.py permet de tester l'API.
+
+## Temps de chargement des résultats
+Si le serveur est en veille avant la requête de l'utilisateur, celle ci peut prendre quelques minutes le temps que
+que le serveur redémarre.
 
 ### Corps de la Requête (Request Body)
 
@@ -63,6 +68,15 @@ Réalise le backtest d'une fonction de stratégie de trading propre à l'utilisa
 
 - **200 Successful Response**: La requête a réussi et le backtest a été réalisé.
 - **422 Validation Error**: Erreur de validation des données envoyées dans la requête.
+
+## Endpoint : /get_result
+La route **get_result** permet de récupérer les résultats d'une requête donc la rééxécution a été programmée.
+Les résultats ont donc été stockés dans un bucket google cloud storage. 
+
+### Corps de la Requête (Request Body)
+- **request_id** correspond 
+à l'ID de requête utilisée lors de la requête initiale sur la route **/backtesting/**. Le fichier client permet
+de tester cette fonctionnalité avec une requête déjà enregistrée sur le bucket.
 
 # Documentation Interne pour les Développeurs
 
@@ -277,13 +291,13 @@ Cette fonction Cloud est conçue pour être déclenchée à des intervalles pré
     - Les données mises à jour sont sauvegardées de nouveau dans Cloud Storage.
     - Si le nombre maximal d'exécutions est atteint, la tâche planifiée dans Cloud Scheduler est supprimée pour éviter des exécutions supplémentaires.
 
-5. **Publication des résultats sur GitHub** :
-    - Les résultats du backtesting sont également publiés sur un dépôt GitHub spécifié, permettant un accès facile et un partage des résultats de backtesting.
-
+5. **Publication des résultats sur bucket** :
+    - Les résultats du backtesting sont enregistrés dans un bucket "resultats_api" sur google cloud storage.
+    - Les résultats peuvent être récupérés par la route '/get_result'.
 ### Sécurité et Gestion des Erreurs
 
 - La fonction vérifie l'existence du fichier de données dans le payload de la requête déclenchante et gère les erreurs potentielles liées à l'absence de ces données.
-- Elle s'assure que les requêtes à l'API de backtesting et à l'API GitHub sont sécurisées et gère les réponses d'erreur, garantissant une exécution fiable et sécurisée des stratégies de trading.
+
 
 ### Usage et Avantages
 
@@ -349,33 +363,12 @@ def trigger_api(request):
         job_path = scheduler_client.job_path(project_id, location, file_name)
         scheduler_client.delete_job(name=job_path)
     
-    # GitHub API pour créer/mettre à jour un fichier
-    github_token = os.environ.get('GITHUB_TOKEN')
-    github_repo = "ororks/BacktestAPI"
-    github_path = f"results/{file_name}"
-    api_url = f"https://api.github.com/repos/{github_repo}/contents/{github_path}"
-    
-    # Encodez le contenu de la réponse en base64
-    content_encoded = base64.b64encode(json.dumps(response.json()).encode()).decode('utf-8')
-    
-    headers = {
-        "Authorization": f"token {github_token}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    
-    # Préparez le payload de la requête pour créer/mettre à jour le fichier
-    data = {
-        "message": "Mise à jour des résultats",
-        "content": content_encoded,
-        "branch": "main",  # Spécifiez votre branche si différente
-    }
-    
-    response = requests.put(api_url, headers=headers, data=json.dumps(data))
-    
-    # Votre logique existante pour gérer les exécutions et potentiellement supprimer la tâche...
+    bucket_results_name = 'results_api'
+    bucket_results = storage_client.bucket(bucket_results_name)
+    request_id = user_request_data.get('request_id')
+    results_blob = bucket_results.blob(f'{request_id}.json')
+    results_blob.upload_from_string(json.dumps(response.json()), content_type='application/json')
 
-    if response.status_code in [200, 201]:
-        return 'Les résultats ont été ajoutés/mis à jour sur GitHub.'
-    else:
-        return f'Erreur lors de la mise à jour sur GitHub: {response.content}'
+
+    return f'Results are stored with ID: {request_id}'
 ```
