@@ -1,7 +1,6 @@
 import pandas as pd
 import requests
 from datetime import datetime, timezone
-from tqdm import tqdm
 
 class DataCollector:
     """
@@ -38,23 +37,20 @@ class DataCollector:
         start_date = int(start_date.timestamp() * 1000)
         end_date = datetime.strptime(self.dates_list[1], '%Y-%m-%d').replace(tzinfo=timezone.utc)
         end_date = int(end_date.timestamp() * 1000)
-        with tqdm(total=len(self.tickers_list), desc="Collecting data", dynamic_ncols=True) as pbar:
-            for symbol in self.tickers_list:
-                params = {
-                    'symbol': symbol,
-                    'interval': self.interval,
-                    'startTime': start_date,
-                    'endTime': end_date
-                }
-                response = requests.get(url, params=params)
-                data = response.json()
-                df = pd.DataFrame(data, columns=['Open_time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close_time',
-                                                 'Quote_volume', 'Nb_trades', 'ignore1', 'ignore2', 'ignore3'])
-                df['Dates'] = pd.to_datetime(df['Open_time'], unit='ms')
-                df = df[['Close']].set_index(df['Dates'])
-                self.data[symbol] = df
-                pbar.set_postfix({f"{symbol}": "Collected"})
-                pbar.update(1)
+        for symbol in self.tickers_list:
+            params = {
+                'symbol': symbol,
+                'interval': self.interval,
+                'startTime': start_date,
+                'endTime': end_date
+            }
+            response = requests.get(url, params=params)
+            data = response.json()
+            df = pd.DataFrame(data, columns=['Open_time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close_time',
+                                             'Quote_volume', 'Nb_trades', 'ignore1', 'ignore2', 'ignore3'])
+            df['Dates'] = pd.to_datetime(df['Open_time'], unit='ms')
+            df = df[['Close']].set_index(df['Dates'])
+            self.data[symbol] = df
         return self.data
 
 #######################################       TEST       ##############################################################
