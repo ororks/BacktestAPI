@@ -1,7 +1,7 @@
 import pandas as pd
 import requests
 from datetime import datetime, timezone
-import tqdm
+from tqdm import tqdm
 
 class DataCollector:
     """

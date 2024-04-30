@@ -12,9 +12,7 @@ from BacktestHandler import BacktestHandler
 from Cloudscheduler import CloudScheduler
 from typing import Optional
 from google.cloud import storage
-from passlib.context import CryptContext
 from datetime import datetime, timedelta
-from jose import jwt, JWTError
 import os
 import re
 
