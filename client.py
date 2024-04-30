@@ -42,7 +42,6 @@ params = {
     "tickers": ["ETHBTC", "BNBETH"],
     "dates": ["2022-01-01", "2023-01-07"],
     "interval": "1d",
-    "amount": "10000",
     "request_id": "random_request_2",
     "is_recurring": True,
     "repeat_frequency": 1,

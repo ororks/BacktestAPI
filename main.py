@@ -1,8 +1,8 @@
 import json
-
 import google.cloud.exceptions
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -12,6 +12,9 @@ from BacktestHandler import BacktestHandler
 from Cloudscheduler import CloudScheduler
 from typing import Optional
 from google.cloud import storage
+from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
 import os
 import re
 
@@ -30,21 +33,21 @@ class UserInput(BaseModel):
                                     import pandas as pd
                                     def fonction_trading(df: pd.DataFrame):
                                     ....
-                                    df_positions = pd.DataFrame()'
-                                    return df_positions
+                                        df_positions = pd.DataFrame()'
+                                        return df_positions
                                     """)
     requirements: list[str] = Field(..., title="Packages requis pour votre fonction",
                                     description="""Ils doivent être fournis dans une liste de string. Seul le nom
                                                 des packages permettant leur installation doit être fournis.""",
-                                    example="['pandas', 'scipy']")
+                                    example=["pandas", "scipy"])
     tickers: list[str] = Field(..., title="Tickers des coins considérés",
                                description="""Les tickers des coins que vous souhaitez utiliser dans votre fonction
                                                 "en liste de string""",
-                               example="['ETHBTC', 'BNBETH']")
+                               example=['ETHBTC', 'BNBETH'])
     dates: list[str] = Field(..., title="Dates considérées",
                              description="""Dates considérées pour les données en liste de string. Les dates doivent
                                          être données en format YYYY-MM-DD.""",
-                             example="['2022-01-01', '2023-01-07']")
+                             example=['2022-01-01', '2023-01-07'])
     interval: str = Field(..., title="Intervalle pour la fréquence des données.",
                           description= """Les intervalles disponibles sont : 
                                        1m,3m,5m,15m,30m,1h,2h,4h,6h,8h,12h,1d,3d,1w,1M.""",
@@ -57,17 +60,17 @@ class UserInput(BaseModel):
                                description="""Booléen pour indiquer si vous souhaitez reprogrammer un backtest de cette
                                            fonction de trading avec les nouvelles données apparues entre l'envoi de la 
                                            requête et la reprogrammation.""",
-                               example="True")
+                               example=False)
     repeat_frequency: int = Field(title="Fréquence de réexécution",
                                   description="""Fréquences standardisées disponibles pour la réexécution de backtests
                                               d'une requête initiale avec les nouvelles données apparues.
                                               Les fréquences disponibles sont : 1, 7, 30 (en jours). La fréquence"
                                               choisie doit être indiquée comme un int.""",
-                                  example="7")
+                                  example=7)
     nb_execution: int = Field(title="Nombre de réexécution",
                               description="""Nombre de réexécutions de la requête intiale prorgammées avec les paramètres
                                           précédents. Ce nombre doit être précisé comme un entier int.""",
-                              example="4")
+                              example=4)
     current_execution_count: Optional[int] = 0
 
 
@@ -120,6 +123,7 @@ storage = storage.Client()
 bucket_name = "results_api"
 bucket = storage.bucket(bucket_name)
 
+
 @app.get('/get_result')
 async def main_get_results(request_id: str):
     blob = bucket.blob(f"{request_id}.json")
@@ -131,5 +135,6 @@ async def main_get_results(request_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Erreur : {str(e)}')
 
-    return json.loads(results)
+    results_to_return = json.loads(results)
+    return results_to_return
 

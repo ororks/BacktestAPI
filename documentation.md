@@ -9,6 +9,10 @@ https://backtestapi.onrender.com/redoc
 Réalise le backtest d'une fonction de stratégie de trading propre à l'utilisateur sur données de bougies de crypto-actifs.
 Le fichier client.py permet de tester l'API.
 
+## Temps de chargement des résultats
+Si le serveur est en veille avant la requête de l'utilisateur, celle ci peut prendre quelques minutes le temps que
+que le serveur redémarre.
+
 ### Corps de la Requête (Request Body)
 
 #### UserInput
