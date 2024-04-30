@@ -43,12 +43,21 @@ params = {
     "dates": ["2022-01-01", "2023-01-07"],
     "interval": "1d",
     "amount": "10000",
-    "request_id": "Roman_rqt3",
+    "request_id": "random_request_2",
     "is_recurring": True,
-    "repeat_frequency": 7,
+    "repeat_frequency": 1,
     "nb_execution": 4,
 }
 
 response = requests.post(url, json=params)
 response = response.json()
 print("Data received from response:", response)
+
+################################################ /get_result ##########################################################
+
+url = "https://backtestapi.onrender.com/get_result"
+params = {
+    "request_id": "random_request_1"
+}
+response = requests.get(url, params=params)
+print(response.json())
